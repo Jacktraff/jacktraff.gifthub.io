@@ -1,10 +1,32 @@
 function filterData() {
   event.preventDefault();
+
+  // Get the start and end date values from the inputs
   var startdate = document.getElementById("startdate").value;
   var enddate = document.getElementById("enddate").value;
-  alert(startdate);
-  alert(enddate);
+
+  // Convert the startdate and enddate to Date objects for comparison
+  var start = new Date(startdate);
+  var end = new Date(enddate);
+
+  // Get all the rows from the table (excluding the header row)
+  var table = document.getElementById("pitchTable");
+  var rows = table.getElementsByTagName("tr");
+
+  // Loop through the rows starting from the second row (index 1)
+  for (var i = 1; i < rows.length; i++) {
+      var dateCell = rows[i].getElementsByTagName("td")[1]; // Assuming the date is in the second column
+      var rowDate = new Date(dateCell.textContent.trim()); // Convert the date in the cell to a Date object
+
+      // Check if the row's date falls within the start and end date range
+      if (rowDate >= start && rowDate <= end) {
+          rows[i].style.display = ""; // Show the row if it matches the range
+      } else {
+          rows[i].style.display = "none"; // Hide the row if it falls outside the range
+      }
+  }
 }
+
 // Fetch the data from the provided URL
 fetch('https://compute.samford.edu/zohauth/clients/datajson/1')
     .then(response => response.json())
