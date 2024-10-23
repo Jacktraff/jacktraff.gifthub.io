@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Pitch Stats</title>
+    <style>
+      .blue {
+        color: #0C2340;
+      }
+      .red {
+        color: #BD1F2D;
+      }
+      th {
+        border-bottom: 1px solid gray;
+        cursor: pointer;
+      }
+      th.sorted-asc::after {
+        content: ' ▲';
+      }
+      th.sorted-desc::after {
+        content: ' ▼';
+      }
+      td {
+        text-align: center;
+      }
+      td.left {
+        text-align: left;
+      }
+      a {
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+      .stats-row td {
+        font-weight: bold;
+        background-color: #f0f0f0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 class="red">Trackman Pitch Stats Viewer</h1>
+    <form onsubmit="filterData();">
+      <label>Starting Date</label>
+      <input type="date" id="startdate" />
+      <label>Ending Date</label>
+      <input type="date" id="enddate" />
+      <button>Filter</button>
+    </form>
+
+    <table class="blue" id="pitchTable">
+      <thead>
+        <tr>
+          <th onclick="sortTable(0)">PitchNo</th>
+          <th onclick="sortTable(1)">Date</th>
+          <th onclick="sortTable(2)">Time</th>
+          <th onclick="sortTable(3)">Batter</th>
+          <th onclick="sortTable(4)">Balls</th>
+          <th onclick="sortTable(5)">Strikes</th>
+          <th onclick="sortTable(6)">Outs</th>
+          <th onclick="sortTable(7)">PitchCall</th>
+          <th onclick="sortTable(8)">KorBB</th>
+          <th onclick="sortTable(9)">RelSpeed</th>
+          <th onclick="sortTable(10)">SpinRate</th>
+          <th onclick="sortTable(11)">SpinAxis</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+      <tfoot>
+        <tr class="stats-row">
+          <td colspan="4">Mean</td>
+          <td id="mean-balls"></td>
+          <td id="mean-strikes"></td>
+          <td id="mean-outs"></td>
+          <td></td>
+          <td></td>
+          <td id="mean-relspeed"></td>
+          <td id="mean-spinrate"></td>
+          <td id="mean-spinaxis"></td>
+        </tr>
+        <tr class="stats-row">
+          <td colspan="4">Median</td>
+          <td id="median-balls"></td>
+          <td id="median-strikes"></td>
+          <td id="median-outs"></td>
+          <td></td>
+          <td></td>
+          <td id="median-relspeed"></td>
+          <td id="median-spinrate"></td>
+          <td id="median-spinaxis"></td>
+        </tr>
+        <tr class="stats-row">
+          <td colspan="4">Mode</td>
+          <td id="mode-balls"></td>
+          <td id="mode-strikes"></td>
+          <td id="mode-outs"></td>
+          <td></td>
+          <td></td>
+          <td id="mode-relspeed"></td>
+          <td id="mode-spinrate"></td>
+          <td id="mode-spinaxis"></td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <script>
+      let currentSortIndex = null;
+      let currentSortOrder = null;
+
+      function filterData() {
+        event.preventDefault();
+
+        var startdate = document.getElementById("startdate").value;
+        var enddate = document.getElementById("enddate").value;
+
+        var start = new Date(startdate);
+        var end = new Date(enddate);
+
+        var table = document.getElementById("pitchTable");
+        var rows = table.getElementsByTagName("tr");
+
+        for (var i = 1; i < rows.length; i++) {
+          var dateCell = rows[i].getElementsByTagName("td")[1];
+          var rowDate = new Date(dateCell.textContent.trim());
+
+          if (rowDate >= start && rowDate <= end) {
+            rows[i].style.display = "";
+          } else {
+            rows[i].style.display = "none";
+          }
+        }
+      }
+
+      function fetchData() {
+        fetch('https://compute.samford.edu/zohauth/clients/datajson/1')
+          .then(response => response.json())
+          .then(data => {
+            const tableBody = document.querySelector('#pitchTable tbody');
+            tableBody.innerHTML = '';
+
+            data.forEach(pitch => {
+              const row = document.createElement('tr');
+              row.innerHTML = `
+                <td><a href="details.html?id=${pitch.PitchNo}">Pitch ${pitch.PitchNo}</a></td>
+                <td>${pitch.Date}</td>
+                <td>${pitch.Time}</td>
+                <td>${pitch.Batter}</td>
+                <td>${pitch.Balls}</td>
+                <td>${pitch.Strikes}</td>
+                <td>${pitch.Outs}</td>
+                <td>${pitch.PitchCall}</td>
+                <td>${pitch.KorBB || ''}</td>
+                <td>${pitch.RelSpeed || ''}</td>
+                <td>${pitch.SpinRate || ''}</td>
+                <td>${pitch.SpinAxis || ''}</td>
+              `;
+              tableBody.appendChild(row);
+            });
+
+            calculateStats(data);
+          })
+          .catch(error => console.error('Error fetching data:', error));
+      }
+
+      function calculateStats(data) {
+        const stats = {
+          balls: getColumnStats(data, 'Balls'),
+          strikes: getColumnStats(data, 'Strikes'),
+          outs: getColumnStats(data, 'Outs'),
+          relSpeed: getColumnStats(data, 'RelSpeed'),
+          spinRate: getColumnStats(data, 'SpinRate'),
+          spinAxis: getColumnStats(data, 'SpinAxis')
+        };
+
+        document.getElementById('mean-balls').textContent = stats.balls.mean;
+        document.getElementById('median-balls').textContent = stats.balls.median;
+        document.getElementById('mode-balls').textContent = stats.balls.mode;
+
+        document.getElementById('mean-strikes').textContent = stats.strikes.mean;
+        document.getElementById('median-strikes').textContent = stats.strikes.median;
+        document.getElementById('mode-strikes').textContent = stats.strikes.mode;
+
+        document.getElementById('mean-outs').textContent = stats.outs.mean;
+        document.getElementById('median-outs').textContent = stats.outs.median;
+        document.getElementById('mode-outs').textContent = stats.outs.mode;
+
+        document.getElementById('mean-relspeed').textContent = stats.relSpeed.mean;
+        document.getElementById('median-relspeed').textContent = stats.relSpeed.median;
+        document.getElementById('mode-relspeed').textContent = stats.relSpeed.mode;
+
+        document.getElementById('mean-spinrate').textContent = stats.spinRate.mean;
+        document.getElementById('median-spinrate').textContent = stats.spinRate.median;
+        document.getElementById('mode-spinrate').textContent = stats.spinRate.mode;
+
+        document.getElementById('mean-spinaxis').textContent = stats.spinAxis.mean;
+        document.getElementById('median-spinaxis').textContent = stats.spinAxis.median;
+        document.getElementById('mode-spinaxis').textContent = stats.spinAxis.mode;
+      }
+
+      function getColumnStats(data, column) {
+        const values = data.map(pitch => parseFloat(pitch[column])).filter(val => !isNaN(val));
+        
+        return {
+          mean: getMean(values),
+          median: getMedian(values),
+          mode: getMode(values)
+        };
+      }
+
+      function getMean(values) {
+        return (values.reduce((a, b) => a + b, 0) / values.length).toFixed(2);
+      }
+
+      function getMedian(values) {
+        values.sort((a, b) => a - b);
+        const middle = Math.floor(values.length / 2);
+
+        return values.length % 2 === 0
+          ? ((values[middle - 1] + values[middle]) / 2).toFixed(2)
+          : values[middle].toFixed(2);
+      }
+
+      function getMode(values) {
+        const frequency = {};
+        let maxFreq = 0;
+        let mode = [];
+
+        values.forEach(value => {
+          frequency[value] = (frequency[value] || 0) + 1;
+          if (frequency[value] > maxFreq) {
+            maxFreq = frequency[value];
+            mode = [value];
+          } else if (frequency[value] === maxFreq) {
+            mode.push(value);
+          }
+        });
+
+        return mode.join(', ');
+      }
+
+      function sortTable(columnIndex) {
+        const table = document.getElementById('pitchTable');
+        const tbody = table.querySelector('tbody');
+        const rows = Array.from(tbody.rows);
+
+        let sortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+
+        rows.sort((a, b) => {
+          const aText = a.cells[columnIndex].textContent.trim();
+          const bText = b.cells[columnIndex].textContent.trim();
+
+          if (!isNaN(aText) && !isNaN(bText)) {
+            return sortOrder === 'asc' ? aText - bText : bText - aText;
+          }
+          return sortOrder === 'asc'
+            ? aText.localeCompare(bText)
+            : bText.localeCompare(aText);
+        });
+
+        tbody.innerHTML = '';
+        rows.forEach(row => tbody.appendChild(row));
+
+        clearSortedHeaders();
+        table.rows[0].cells[columnIndex].classList.add(`sorted-${sortOrder}`);
+
+        currentSortIndex = columnIndex;
+        currentSortOrder = sortOrder;
+      }
+
+      function clearSortedHeaders() {
+        const headers = document.querySelectorAll('th');
+        headers.forEach(header => {
+          header.classList.remove('sorted-asc', 'sorted-desc');
+        });
+      }
+
+      fetchData();
+    </script>
+  </body>
+</html>
