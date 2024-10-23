@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Pitch Stats</title>
+    <style>
+      .blue {
+        color: #0C2340;
+      }
+      .red {
+        color: #BD1F2D;
+      }
+      th {
+        border-bottom: 1px solid gray;
+        cursor: pointer;
+      }
+      th.sorted-asc::after {
+        content: ' ▲';
+      }
+      th.sorted-desc::after {
+        content: ' ▼';
+      }
+      td {
+        text-align: center;
+      }
+      td.left {
+        text-align: left;
+      }
+      a {
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 class="red">Trackman Pitch Stats Viewer</h1>
+    <form onsubmit="filterData();">
+      <label>Starting Date</label>
+      <input type="date" id="startdate" />
+      <label>Ending Date</label>
+      <input type="date" id="enddate" />
+      <button>Filter</button>
+    </form>
+
+    <table class="blue" id="pitchTable">
+      <thead>
+        <tr>
+          <th onclick="sortTable(0)">PitchNo</th>
+          <th onclick="sortTable(1)">Date</th>
+          <th onclick="sortTable(2)">Time</th>
+          <th onclick="sortTable(3)">Batter</th>
+          <th onclick="sortTable(4)">Balls</th>
+          <th onclick="sortTable(5)">Strikes</th>
+          <th onclick="sortTable(6)">Outs</th>
+          <th onclick="sortTable(7)">PitchCall</th>
+          <th onclick="sortTable(8)">KorBB</th>
+          <th onclick="sortTable(9)">RelSpeed</th>
+          <th onclick="sortTable(10)">SpinRate</th>
+          <th onclick="sortTable(11)">SpinAxis</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <script>
+      let currentSortIndex = null;
+      let currentSortOrder = null;
+
+      function filterData() {
+        event.preventDefault();
+
+        var startdate = document.getElementById("startdate").value;
+        var enddate = document.getElementById("enddate").value;
+
+        var start = new Date(startdate);
+        var end = new Date(enddate);
+
+        var table = document.getElementById("pitchTable");
+        var rows = table.getElementsByTagName("tr");
+
+        for (var i = 1; i < rows.length; i++) {
+          var dateCell = rows[i].getElementsByTagName("td")[1];
+          var rowDate = new Date(dateCell.textContent.trim());
+
+          if (rowDate >= start && rowDate <= end) {
+            rows[i].style.display = "";
+          } else {
+            rows[i].style.display = "none";
+          }
+        }
+      }
+
+      function fetchData() {
+        fetch('https://compute.samford.edu/zohauth/clients/datajson/1')
+          .then(response => response.json())
+          .then(data => {
+            const tableBody = document.querySelector('#pitchTable tbody');
+            tableBody.innerHTML = '';
+
+            data.forEach(pitch => {
+              const row = document.createElement('tr');
+              row.innerHTML = `
+                <td><a href="details.html?id=${pitch.PitchNo}">Pitch ${pitch.PitchNo}</a></td>
+                <td>${pitch.Date}</td>
+                <td>${pitch.Time}</td>
+                <td>${pitch.Batter}</td>
+                <td>${pitch.Balls}</td>
+                <td>${pitch.Strikes}</td>
+                <td>${pitch.Outs}</td>
+                <td>${pitch.PitchCall}</td>
+                <td>${pitch.KorBB || ''}</td>
+                <td>${pitch.RelSpeed || ''}</td>
+                <td>${pitch.SpinRate || ''}</td>
+                <td>${pitch.SpinAxis || ''}</td>
+              `;
+              tableBody.appendChild(row);
+            });
+          })
+          .catch(error => console.error('Error fetching data:', error));
+      }
+
+      function sortTable(columnIndex) {
+        const table = document.getElementById('pitchTable');
+        const tbody = table.querySelector('tbody');
+        const rows = Array.from(tbody.rows);
+
+        let sortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+
+        rows.sort((a, b) => {
+          const aText = a.cells[columnIndex].textContent.trim();
+          const bText = b.cells[columnIndex].textContent.trim();
+
+          if (!isNaN(aText) && !isNaN(bText)) {
+            return sortOrder === 'asc' ? aText - bText : bText - aText;
+          }
+          return sortOrder === 'asc'
+            ? aText.localeCompare(bText)
+            : bText.localeCompare(aText);
+        });
+
+        tbody.innerHTML = '';
+        rows.forEach(row => tbody.appendChild(row));
+
+        clearSortedHeaders();
+        table.rows[0].cells[columnIndex].classList.add(`sorted-${sortOrder}`);
+
+        currentSortIndex = columnIndex;
+        currentSortOrder = sortOrder;
+      }
+
+      function clearSortedHeaders() {
+        const headers = document.querySelectorAll('th');
+        headers.forEach(header => {
+          header.classList.remove('sorted-asc', 'sorted-desc');
+        });
+      }
+
+      fetchData();
+    </script>
+  </body>
+</html>
